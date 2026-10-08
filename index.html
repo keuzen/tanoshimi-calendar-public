@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f4ee">
+    <title>楽しみカレンダー｜カレンダーホーム案</title>
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./styles-calendar-home.css">
+    <script type="module" src="./src/app-calendar-home.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#calendar" data-page="calendar" aria-label="カレンダーへ">
+          <svg class="brand-mark" viewBox="0 0 128 128" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="4" width="120" height="120" rx="30" fill="#eae6fa"/>
+            <rect x="28" y="35" width="72" height="73" rx="12" fill="#fffefa" stroke="#7466b7" stroke-width="6"/>
+            <path d="M31 59h66" fill="none" stroke="#7466b7" stroke-width="6"/>
+            <path d="M47 27v18M81 27v18" fill="none" stroke="#25243a" stroke-width="7" stroke-linecap="round"/>
+            <rect x="41" y="69" width="12" height="12" rx="3" fill="#eae6fa"/>
+            <rect x="60" y="69" width="12" height="12" rx="3" fill="#eae6fa"/>
+            <rect x="41" y="88" width="12" height="12" rx="3" fill="#eae6fa"/>
+            <path d="M82 72c2.1 8.1 4.2 10.2 12 12.3-7.8 2.1-9.9 4.2-12 12.3-2.1-8.1-4.2-10.2-12-12.3 7.8-2.1 9.9-4.2 12-12.3Z" fill="#f1846e"/>
+          </svg>
+          <span>楽しみカレンダー</span>
+        </a>
+        <div class="topbar-actions">
+          <span class="prototype-badge"><span class="badge-dot" aria-hidden="true"></span>架空データの試作</span>
+          <button class="text-button" id="resetButton" type="button">デモをリセット</button>
+        </div>
+      </header>
+
+      <nav class="main-nav" aria-label="メインメニュー">
+        <button class="nav-button is-active" type="button" data-page="calendar" aria-current="page">カレンダー</button>
+        <button class="nav-button" type="button" data-page="search">楽しみを探す</button>
+        <button class="nav-button" type="button" data-page="personal">自分の楽しみを追加</button>
+      </nav>
+
+      <main>
+        <section class="page-view calendar-home-view" id="page-calendar" aria-labelledby="monthTitle">
+          <div class="next-card calendar-next" id="nextCard" aria-live="polite"></div>
+          <section class="calendar-panel">
+            <div class="calendar-toolbar">
+              <button class="icon-button" id="previousMonth" type="button" aria-label="前の月">←</button>
+              <h1 id="monthTitle"></h1>
+              <button class="icon-button" id="nextMonth" type="button" aria-label="次の月">→</button>
+            </div>
+            <div class="calendar-weekdays" aria-hidden="true">
+              <span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span><span>日</span>
+            </div>
+            <div class="calendar-grid-wrap">
+              <div class="calendar-grid" id="calendarGrid" role="grid" aria-label="月間カレンダー"></div>
+              <div class="day-actions" id="selectedDateActions" hidden role="group" aria-label="選択した日付への追加方法">
+                <div class="day-actions-heading">
+                  <p>この日の追加方法</p>
+                  <button class="day-actions-close" id="closeSelectedDateActions" type="button" aria-label="追加方法を閉じる">×</button>
+                </div>
+                <div class="day-action-buttons">
+                  <button class="button button-primary button-small" id="findEventsOnDate" type="button">楽しみを探す</button>
+                  <button class="button button-outline button-small" id="addPersonalOnDate" type="button">自分の楽しみを追加</button>
+                </div>
+              </div>
+            </div>
+            <p class="calendar-hint">日付をタップして楽しみを追加</p>
+            <div class="selected-day-panel">
+              <div class="selected-day-heading">
+                <div>
+                  <h3 id="selectedDayTitle"></h3>
+                </div>
+                <span class="count-pill" id="selectedDayCount"></span>
+              </div>
+              <div class="day-events" id="selectedDayEvents"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page-view" id="page-search" aria-labelledby="searchHeading" hidden>
+          <div class="page-heading">
+            <h1 id="searchHeading">空いている日に、楽しみを。</h1>
+          </div>
+
+          <section class="search-panel" aria-label="イベント検索条件">
+            <form id="searchForm" class="search-form">
+              <label class="field">
+                <span>日付</span>
+                <input id="searchDate" name="date" type="date">
+              </label>
+              <label class="field">
+                <span>ジャンル</span>
+                <select id="searchGenre" name="genre">
+                  <option value="all">すべて</option>
+                  <option value="fps">FPS・eスポーツ</option>
+                  <option value="mahjong">麻雀リーグ</option>
+                </select>
+              </label>
+              <button class="button button-primary search-submit" type="submit">イベントを検索</button>
+            </form>
+            <div class="availability-action">
+              <div>
+                <strong>空き時間から探す</strong>
+                <p>架空の予定時間で空き枠を表示します。</p>
+              </div>
+              <button class="button button-outline" id="showAvailability" type="button">枠を見る</button>
+            </div>
+            <div class="availability-panel" id="availabilityPanel" hidden>
+              <div class="availability-title">
+                <div>
+                  <h2>空いている時間</h2>
+                  <p>予定名は表示せず、時間帯だけ表示します。</p>
+                </div>
+                <button class="icon-button" id="closeAvailability" type="button" aria-label="空き時間パネルを閉じる">×</button>
+              </div>
+              <div id="availabilityList" class="availability-list"></div>
+            </div>
+            <p class="selected-slot-note" id="selectedSlotNote" hidden></p>
+          </section>
+
+          <section class="content-section results-section">
+            <div class="section-heading">
+              <div>
+                <h2>検索結果</h2>
+              </div>
+              <span class="count-pill" id="resultCount"></span>
+            </div>
+            <div class="event-grid" id="searchResults"></div>
+          </section>
+        </section>
+
+        <section class="page-view" id="page-personal" aria-labelledby="personalHeading" hidden>
+          <div class="page-heading">
+            <h1 id="personalHeading">自分の楽しみを追加</h1>
+          </div>
+          <div class="personal-layout">
+            <form id="personalForm" class="personal-form">
+              <label class="field">
+                <span>楽しみの名前</span>
+                <input id="personalTitle" name="title" type="text" maxlength="60" placeholder="例：映画を見に行く" required>
+              </label>
+              <label class="field">
+                <span>日付</span>
+                <input id="personalDate" name="date" type="date" required>
+              </label>
+              <button class="button button-primary" type="submit">追加する</button>
+              <p class="privacy-note">このブラウザー内に保存されます。</p>
+            </form>
+            <aside class="personal-note">
+              <span class="note-icon" aria-hidden="true">✦</span>
+              <h2>待ち遠しい日を、<br>ひとつ増やす。</h2>
+            </aside>
+          </div>
+          <section class="content-section">
+            <div class="section-heading">
+              <div><h2>追加した楽しみ</h2></div>
+            </div>
+            <div class="event-grid" id="personalEvents"></div>
+          </section>
+        </section>
+
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      </main>
+
+      <footer class="footer">
+        <span>これは操作確認用のローカル試作です。</span>
+        <span>表示されるイベントはすべて架空です。</span>
+      </footer>
+    </div>
+  </body>
+</html>

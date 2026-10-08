@@ -1,0 +1,29 @@
+.calendar-home-view { padding-top: 18px; }
+.calendar-next {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px 16px;
+  min-height: 0;
+  margin-bottom: 14px;
+  padding: 12px 18px;
+  border-radius: 16px;
+}
+.calendar-next::after { top: -18px; right: -8px; width: 68px; height: 68px; pointer-events: none; }
+.calendar-next .next-label { grid-column: 1; margin: 0; font-size: 11px; }
+.calendar-next h2 { grid-column: 1; margin: 0; font-size: 15px; line-height: 1.4; }
+.calendar-next .next-date { grid-column: 1; margin: 0; font-size: 11px; }
+.calendar-next .countdown { grid-column: 2; grid-row: 1 / span 3; gap: 5px; }
+.calendar-next .countdown strong { font-size: 26px; }
+.calendar-next .countdown span { font-size: 11px; }
+.calendar-next .empty-next { grid-column: 1 / -1; display: grid; min-height: 0; grid-template-columns: minmax(0, 1fr); gap: 4px; align-content: center; }
+.calendar-next .empty-next p { margin: 0; }
+.calendar-next .empty-next p:last-child { font-size: 12px; }
+.calendar-panel { padding: clamp(16px, 3vw, 28px); }
+.calendar-toolbar h1 { min-width: 130px; margin: 0; text-align: center; font-size: 20px; }
+.calendar-day-item { background: #fcf8f0; }
+
+@media (max-width: 760px) {
+  .calendar-next { padding: 11px 14px; }
+  .calendar-panel { padding: clamp(16px, 4vw, 24px); }
+}
