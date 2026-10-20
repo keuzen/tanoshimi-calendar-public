@@ -1,25 +1,27 @@
-import { SAMPLE_EVENTS, SAMPLE_BUSY_BLOCKS, SAMPLE_AVAILABILITY_DATES } from "./sample-data.js";
+import { TERMS_VERSION } from "./config.js";
+import { startAnalytics, track } from "./analytics.js";
+import { initSurvey, notifyItemAdded } from "./survey.js";
 
+// 既存の保存データを引き継ぐため、キー名は変えない。
 const STORAGE_KEY = "tanoshimi-calendar-demo-v1";
+const CONSENT_KEY = "tanoshimi-calendar-consent";
 const $ = (selector) => document.querySelector(selector);
 const state = loadState();
 let selectedMonth = currentTokyoMonth();
 let selectedDate = tokyoDateKey();
-let selectedFreeWindow = null;
 let selectedDateHasFocus = false;
 let dateActionsVisible = false;
-let returnToCalendarAfterEventAdd = false;
+let addSource = "nav";
 let toastTimer = null;
+let storageReadFailed = false;
 
 function loadState() {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    return {
-      savedEventIds: Array.isArray(parsed.savedEventIds) ? parsed.savedEventIds : [],
-      personalEvents: Array.isArray(parsed.personalEvents) ? parsed.personalEvents : []
-    };
+    return { personalEvents: Array.isArray(parsed.personalEvents) ? parsed.personalEvents : [] };
   } catch {
-    return { savedEventIds: [], personalEvents: [] };
+    storageReadFailed = true;
+    return { personalEvents: [] };
   }
 }
 
@@ -28,6 +30,7 @@ function saveState() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     return true;
   } catch {
+    track("tanoshimi_error", { error_type: "storage_write" });
     showToast("保存できませんでした。ブラウザーの保存設定をご確認ください。");
     return false;
   }
@@ -85,88 +88,26 @@ function dayDifference(dateKey) {
   return Math.round((target - today) / 86400000);
 }
 
-function minutes(time) {
-  const [hour, minute] = time.split(":").map(Number);
-  return hour * 60 + minute;
-}
-
-function timeFromMinutes(value) {
-  const hour = Math.floor(value / 60);
-  const minute = value % 60;
-  return String(hour).padStart(2, "0") + ":" + String(minute).padStart(2, "0");
-}
-
-function timeLabel(item) {
-  if (item.allDay) return "";
-  return item.startTime + "–" + item.endTime;
-}
-
-function sortItems(items) {
-  return [...items].sort((a, b) => {
-    const left = a.date + "T" + (a.startTime || "00:00");
-    const right = b.date + "T" + (b.startTime || "00:00");
-    return left.localeCompare(right);
-  });
-}
-
 function savedItems() {
-  const publicItems = SAMPLE_EVENTS
-    .filter((event) => state.savedEventIds.includes(event.id))
-    .map((event) => ({ ...event, itemType: "public" }));
-  const personalItems = state.personalEvents.map((event) => ({
-    ...event,
-    genreLabel: "自分の楽しみ",
-    itemType: "personal",
-    allDay: true
-  }));
-  return sortItems(publicItems.concat(personalItems));
+  return [...state.personalEvents].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function upcomingItems() {
-  const now = new Date();
-  return savedItems().filter((item) => {
-    const time = item.allDay ? "23:59" : item.startTime;
-    return new Date(item.date + "T" + time + ":00+09:00") >= now;
-  });
+  const today = tokyoDateKey();
+  return savedItems().filter((item) => item.date >= today);
 }
 
-function makeEventCard(item, action, compact = false) {
-  const card = el("article", "event-card" + (item.itemType === "personal" ? " personal-event-card" : ""));
-  const top = el("div", "event-card-top");
-  const badge = el("span", "genre-badge" + (item.genre === "mahjong" ? " is-mahjong" : ""), item.genreLabel);
-  top.append(badge);
-  if (!compact && action !== "add") top.append(el("span", "sample-label", item.itemType === "personal" ? "あなたの予定" : "架空サンプル"));
-  card.append(top, el("h3", "", item.title));
-
+function makeEventCard(item) {
+  const card = el("article", "event-card personal-event-card");
+  card.append(el("h3", "", item.title));
   const meta = el("p", "event-meta");
   meta.append(el("span", "", formatDate(item.date, { year: true })));
-  const time = timeLabel(item);
-  if (time) meta.append(el("span", "", time));
   card.append(meta);
-
-  if (item.description) {
-    const details = document.createElement("details");
-    details.append(el("summary", "", "内容を見る"), el("p", "event-description", item.description));
-    card.append(details);
-  }
-
   const actions = el("div", "event-card-actions");
-  if (action === "add") {
-    const alreadySaved = state.savedEventIds.includes(item.id);
-    const button = el("button", "button button-primary button-small", alreadySaved ? "登録済み" : "カレンダーに追加");
-    button.type = "button";
-    button.disabled = alreadySaved;
-    button.addEventListener("click", () => addEvent(item.id));
-    actions.append(button);
-  } else if (action === "remove") {
-    const remove = el("button", "button button-remove button-small", "削除");
-    remove.type = "button";
-    remove.addEventListener("click", () => removeItem(item));
-    if (!compact) actions.append(el("span", "sample-label", item.itemType === "personal" ? "自分の予定" : "カレンダー登録済み"));
-    actions.append(remove);
-  } else {
-    actions.append(el("span", "sample-label", "楽しみを見つけたら登録"));
-  }
+  const remove = el("button", "button button-remove button-small", "削除");
+  remove.type = "button";
+  remove.addEventListener("click", () => removeItem(item));
+  actions.append(remove);
   card.append(actions);
   return card;
 }
@@ -179,24 +120,33 @@ function showToast(message) {
   toastTimer = window.setTimeout(() => toast.classList.remove("is-visible"), 2600);
 }
 
+function safeRender(render) {
+  try {
+    render();
+  } catch (error) {
+    console.error(error);
+    track("tanoshimi_error", { error_type: "render" });
+  }
+}
+
 function showPage(page) {
   document.querySelectorAll(".page-view").forEach((view) => {
     view.hidden = view.id !== "page-" + page;
   });
-  document.querySelectorAll("[data-page]").forEach((button) => {
+  document.querySelectorAll(".nav-button").forEach((button) => {
     const active = button.dataset.page === page;
-    button.classList.toggle("is-active", active && button.classList.contains("nav-button"));
-    if (button.classList.contains("nav-button")) {
-      if (active) button.setAttribute("aria-current", "page");
-      else button.removeAttribute("aria-current");
-    }
+    button.classList.toggle("is-active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
   });
   if (page === "calendar") {
-    renderCalendar();
-    renderCalendarNext();
+    safeRender(renderCalendar);
+    safeRender(renderCalendarNext);
   }
-  if (page === "search") renderResults();
-  if (page === "personal") renderPersonalEvents();
+  if (page === "personal") {
+    safeRender(renderPersonalEvents);
+    track("tanoshimi_add_view", { add_source: addSource });
+  }
 }
 
 function renderCalendarNext() {
@@ -207,17 +157,15 @@ function renderCalendarNext() {
     const empty = el("div", "empty-next");
     empty.append(el("p", "next-label", "いちばん近い楽しみ"), el("p", "", "これからの楽しみを登録すると、ここに表示されます。"));
     nextCard.append(empty);
-  } else {
-    const next = upcoming[0];
-    const days = dayDifference(next.date);
-    nextCard.append(el("p", "next-label", "いちばん近い楽しみ"), el("h2", "", next.title));
-    const time = timeLabel(next);
-    nextCard.append(el("p", "next-date", formatDate(next.date, { year: true }) + (time ? " ・ " + time : "")));
-    const countdown = el("div", "countdown");
-    countdown.append(el("strong", "", String(Math.max(days, 0))), el("span", "", days === 0 ? "今日" : "日後"));
-    nextCard.append(countdown);
+    return;
   }
-
+  const next = upcoming[0];
+  const days = dayDifference(next.date);
+  nextCard.append(el("p", "next-label", "いちばん近い楽しみ"), el("h2", "", next.title));
+  nextCard.append(el("p", "next-date", formatDate(next.date, { year: true })));
+  const countdown = el("div", "countdown");
+  countdown.append(el("strong", "", String(Math.max(days, 0))), el("span", "", days === 0 ? "今日" : "日後"));
+  nextCard.append(countdown);
 }
 
 function positionDateActions(grid, anchor) {
@@ -285,7 +233,7 @@ function renderCalendar() {
         selectedDateHasFocus = true;
         dateActionsVisible = false;
       }
-      renderCalendar();
+      safeRender(renderCalendar);
     });
     grid.append(button);
   }
@@ -306,159 +254,110 @@ function renderCalendar() {
   } else {
     selectedItems.forEach((item) => {
       const row = el("div", "day-event-row");
-      const time = timeLabel(item);
-      if (time) row.append(el("span", "day-event-time", time));
-      row.append(el("span", "day-event-name", item.title), el("span", "day-event-kind", item.genreLabel));
+      row.append(el("span", "day-event-name", item.title));
       dayList.append(row);
     });
   }
 }
 
-function freeWindows(date) {
-  const dayStart = 9 * 60;
-  const dayEnd = 23 * 60;
-  const busy = SAMPLE_BUSY_BLOCKS
-    .filter((block) => block.date === date)
-    .map((block) => ({ start: minutes(block.start), end: minutes(block.end) }))
-    .sort((a, b) => a.start - b.start);
-  const windows = [];
-  let cursor = dayStart;
-  busy.forEach((block) => {
-    if (block.start > cursor && block.start - cursor >= 60) windows.push({ start: cursor, end: block.start });
-    cursor = Math.max(cursor, block.end);
-  });
-  if (dayEnd > cursor && dayEnd - cursor >= 60) windows.push({ start: cursor, end: dayEnd });
-  return windows;
-}
-
-function renderAvailability() {
-  const list = $("#availabilityList");
-  list.replaceChildren();
-  let slotCount = 0;
-  SAMPLE_AVAILABILITY_DATES.forEach((date) => {
-    const windows = freeWindows(date);
-    if (!windows.length) return;
-    const group = el("section", "availability-date");
-    group.append(el("h3", "", formatDate(date, { year: true })));
-    const buttons = el("div", "availability-windows");
-    windows.forEach((window) => {
-      slotCount += 1;
-      const button = el("button", "slot-button", timeFromMinutes(window.start) + "–" + timeFromMinutes(window.end));
-      button.type = "button";
-      button.addEventListener("click", () => {
-        selectedFreeWindow = { date, start: window.start, end: window.end };
-        $("#searchDate").value = date;
-        $("#availabilityPanel").hidden = true;
-        $("#selectedSlotNote").hidden = false;
-        $("#selectedSlotNote").textContent = formatDate(date, { year: true }) + " " + timeFromMinutes(window.start) + "–" + timeFromMinutes(window.end) + " の枠で検索中";
-        renderResults();
-      });
-      buttons.append(button);
-    });
-    group.append(buttons);
-    list.append(group);
-  });
-  if (!slotCount) list.append(el("p", "day-empty", "空き時間がありません。"));
-}
-
-function renderResults() {
-  const date = $("#searchDate").value;
-  const genre = $("#searchGenre").value;
-  let results = SAMPLE_EVENTS.filter((event) => {
-    if (date && event.date !== date) return false;
-    if (genre !== "all" && event.genre !== genre) return false;
-    if (selectedFreeWindow) {
-      if (event.date !== selectedFreeWindow.date) return false;
-      if (minutes(event.startTime) < selectedFreeWindow.start || minutes(event.endTime) > selectedFreeWindow.end) return false;
-    }
-    return true;
-  });
-  results = sortItems(results);
-  $("#resultCount").textContent = results.length + "件";
-  const container = $("#searchResults");
-  container.replaceChildren();
-  if (results.length === 0) {
-    const empty = el("div", "empty-card");
-    empty.append(el("strong", "", "条件に合うイベントがありません"));
-    container.append(empty);
-    return;
-  }
-  results.forEach((event) => container.append(makeEventCard(event, "add")));
-}
-
-function addEvent(id) {
-  if (!state.savedEventIds.includes(id)) {
-    state.savedEventIds.push(id);
-    if (!saveState()) {
-      state.savedEventIds = state.savedEventIds.filter((savedId) => savedId !== id);
-      return;
-    }
-  }
-  const addedEvent = SAMPLE_EVENTS.find((event) => event.id === id);
-  if (returnToCalendarAfterEventAdd && addedEvent) {
-    selectedDate = addedEvent.date;
-    const [year, month] = addedEvent.date.split("-").map(Number);
-    selectedMonth = new Date(Date.UTC(year, month - 1, 1));
-    selectedDateHasFocus = false;
-    dateActionsVisible = false;
-    returnToCalendarAfterEventAdd = false;
-    showPage("calendar");
-    showToast("カレンダーに楽しみを追加しました。");
-    return;
-  }
-  renderResults();
-  renderCalendarNext();
-  showToast("カレンダーに楽しみを追加しました。");
-}
-
 function removeItem(item) {
-  if (item.itemType === "personal") {
-    state.personalEvents = state.personalEvents.filter((event) => event.id !== item.id);
-  } else {
-    state.savedEventIds = state.savedEventIds.filter((id) => id !== item.id);
+  const before = state.personalEvents;
+  state.personalEvents = state.personalEvents.filter((event) => event.id !== item.id);
+  if (!saveState()) {
+    state.personalEvents = before;
+    return;
   }
-  saveState();
-  renderCalendarNext();
-  renderCalendar();
-  renderPersonalEvents();
-  showToast("カレンダーから削除しました。");
+  track("tanoshimi_item_remove");
+  safeRender(renderCalendarNext);
+  safeRender(renderCalendar);
+  safeRender(renderPersonalEvents);
+  showToast("削除しました。");
 }
 
 function renderPersonalEvents() {
   const list = $("#personalEvents");
-  if (!list) return;
   list.replaceChildren();
-  savedItems().filter((item) => item.itemType === "personal").forEach((item) => list.append(makeEventCard(item, "remove", true)));
+  const items = savedItems();
+  if (items.length === 0) {
+    list.append(el("p", "day-empty", "まだ楽しみはありません。"));
+    return;
+  }
+  items.forEach((item) => list.append(makeEventCard(item)));
+}
+
+// ---- 利用規約 ----
+
+function hasConsent() {
+  try {
+    return localStorage.getItem(CONSENT_KEY) === TERMS_VERSION;
+  } catch {
+    return false;
+  }
+}
+
+function updateTermsReadState() {
+  const body = $("#termsBody");
+  const reachedEnd = body.scrollTop + body.clientHeight >= body.scrollHeight - 8;
+  if (!reachedEnd) return;
+  $("#termsRead").disabled = false;
+  $("#termsHint").textContent = "確認したら、チェックを入れてください。";
+}
+
+function openTerms(mode) {
+  const body = $("#termsBody");
+  $("#termsAgreeArea").hidden = mode !== "agree";
+  $("#termsViewArea").hidden = mode !== "view";
+  $("#termsDialog").hidden = false;
+  body.scrollTop = 0;
+  if (mode === "agree") {
+    $("#termsRead").checked = false;
+    $("#termsRead").disabled = true;
+    $("#termsAgree").disabled = true;
+    window.requestAnimationFrame(updateTermsReadState);
+  }
+  body.focus();
+}
+
+function agreeTerms() {
+  try {
+    localStorage.setItem(CONSENT_KEY, TERMS_VERSION);
+  } catch {
+    showToast("同意を保存できませんでした。ブラウザーの保存設定をご確認ください。");
+    return;
+  }
+  $("#termsDialog").hidden = true;
+  startAnalytics();
+  track("tanoshimi_terms_agree", { terms_version: TERMS_VERSION });
+  startApp();
+}
+
+// ---- 起動 ----
+
+function startApp() {
+  startAnalytics();
+  if (storageReadFailed) track("tanoshimi_error", { error_type: "storage_read" });
+  track("tanoshimi_app_ready", { entry_state: state.personalEvents.length > 0 ? "existing" : "new" });
+  initSurvey({ today: () => tokyoDateKey(), hasItems: () => state.personalEvents.length > 0 });
 }
 
 document.querySelectorAll("[data-page]").forEach((button) => {
   button.addEventListener("click", (event) => {
     event.preventDefault();
-    returnToCalendarAfterEventAdd = false;
+    addSource = "nav";
     showPage(button.dataset.page);
   });
 });
 
-$("#findEventsOnDate").addEventListener("click", () => {
-  dateActionsVisible = false;
-  returnToCalendarAfterEventAdd = true;
-  selectedFreeWindow = null;
-  $("#searchDate").value = selectedDate;
-  $("#searchGenre").value = "all";
-  $("#selectedSlotNote").hidden = true;
-  $("#availabilityPanel").hidden = true;
-  showPage("search");
-});
-
 $("#closeSelectedDateActions").addEventListener("click", () => {
   dateActionsVisible = false;
-  renderCalendar();
+  safeRender(renderCalendar);
 });
 
 $("#addPersonalOnDate").addEventListener("click", () => {
   dateActionsVisible = false;
   $("#personalTitle").value = "";
   $("#personalDate").value = selectedDate;
+  addSource = "calendar_date";
   showPage("personal");
   $("#personalTitle").focus();
 });
@@ -467,43 +366,14 @@ $("#previousMonth").addEventListener("click", () => {
   selectedMonth = new Date(Date.UTC(selectedMonth.getUTCFullYear(), selectedMonth.getUTCMonth() - 1, 1));
   selectedDateHasFocus = false;
   dateActionsVisible = false;
-  renderCalendar();
+  safeRender(renderCalendar);
 });
 
 $("#nextMonth").addEventListener("click", () => {
   selectedMonth = new Date(Date.UTC(selectedMonth.getUTCFullYear(), selectedMonth.getUTCMonth() + 1, 1));
   selectedDateHasFocus = false;
   dateActionsVisible = false;
-  renderCalendar();
-});
-
-$("#searchForm").addEventListener("submit", (event) => {
-  event.preventDefault();
-  selectedFreeWindow = null;
-  $("#selectedSlotNote").hidden = true;
-  $("#availabilityPanel").hidden = true;
-  renderResults();
-});
-
-$("#searchDate").addEventListener("input", () => {
-  selectedFreeWindow = null;
-  $("#selectedSlotNote").hidden = true;
-  renderResults();
-});
-
-$("#searchGenre").addEventListener("change", () => {
-  selectedFreeWindow = null;
-  $("#selectedSlotNote").hidden = true;
-  renderResults();
-});
-
-$("#showAvailability").addEventListener("click", () => {
-  renderAvailability();
-  $("#availabilityPanel").hidden = false;
-});
-
-$("#closeAvailability").addEventListener("click", () => {
-  $("#availabilityPanel").hidden = true;
+  safeRender(renderCalendar);
 });
 
 $("#personalForm").addEventListener("submit", (event) => {
@@ -521,35 +391,30 @@ $("#personalForm").addEventListener("submit", (event) => {
     state.personalEvents.pop();
     return;
   }
+  track("tanoshimi_item_add", { add_source: addSource });
+  addSource = "nav";
   $("#personalForm").reset();
-  renderPersonalEvents();
-  renderCalendarNext();
   selectedDate = date;
   const parts = date.split("-").map(Number);
   selectedMonth = new Date(Date.UTC(parts[0], parts[1] - 1, 1));
   selectedDateHasFocus = false;
   dateActionsVisible = false;
   showPage("calendar");
-  showToast("自分の楽しみを追加しました。");
+  showToast("楽しみを追加しました。");
+  notifyItemAdded();
 });
 
-$("#resetButton").addEventListener("click", () => {
-  if (!window.confirm("このブラウザーに保存した楽しみをすべて削除しますか？")) return;
-  state.savedEventIds = [];
-  state.personalEvents = [];
-  saveState();
-  selectedFreeWindow = null;
-  selectedDateHasFocus = false;
-  dateActionsVisible = false;
-  returnToCalendarAfterEventAdd = false;
-  $("#searchDate").value = "";
-  $("#searchGenre").value = "all";
-  $("#selectedSlotNote").hidden = true;
-  renderCalendarNext();
-  renderCalendar();
-  renderResults();
-  renderPersonalEvents();
-  showToast("デモの登録内容をリセットしました。");
+$("#termsBody").addEventListener("scroll", updateTermsReadState);
+$("#termsRead").addEventListener("change", () => {
+  $("#termsAgree").disabled = !$("#termsRead").checked;
+});
+$("#termsAgree").addEventListener("click", agreeTerms);
+$("#termsCloseView").addEventListener("click", () => {
+  $("#termsDialog").hidden = true;
+});
+$("#showTermsButton").addEventListener("click", () => openTerms("view"));
+$("#termsDialog").addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !$("#termsViewArea").hidden) $("#termsDialog").hidden = true;
 });
 
 window.addEventListener("resize", () => {
@@ -558,7 +423,13 @@ window.addEventListener("resize", () => {
   positionDateActions(grid, grid.querySelector(".calendar-day.is-selected"));
 });
 
-renderCalendarNext();
-renderCalendar();
-renderResults();
-renderPersonalEvents();
+try {
+  safeRender(renderCalendarNext);
+  safeRender(renderCalendar);
+  safeRender(renderPersonalEvents);
+  if (hasConsent()) startApp();
+  else openTerms("agree");
+} catch (error) {
+  console.error(error);
+  track("tanoshimi_error", { error_type: "app_initialization" });
+}

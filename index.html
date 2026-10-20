@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f7f4ee">
-    <title>楽しみカレンダー｜カレンダーホーム案</title>
+    <title>楽しみカレンダー</title>
     <link rel="stylesheet" href="./styles.css">
     <link rel="stylesheet" href="./styles-calendar-home.css">
     <script type="module" src="./src/app-calendar-home.js"></script>
@@ -26,15 +26,13 @@
           <span>楽しみカレンダー</span>
         </a>
         <div class="topbar-actions">
-          <span class="prototype-badge"><span class="badge-dot" aria-hidden="true"></span>架空データの試作</span>
-          <button class="text-button" id="resetButton" type="button">デモをリセット</button>
+          <button class="text-button" id="feedbackButton" type="button">感想を送る</button>
         </div>
       </header>
 
       <nav class="main-nav" aria-label="メインメニュー">
         <button class="nav-button is-active" type="button" data-page="calendar" aria-current="page">カレンダー</button>
-        <button class="nav-button" type="button" data-page="search">楽しみを探す</button>
-        <button class="nav-button" type="button" data-page="personal">自分の楽しみを追加</button>
+        <button class="nav-button" type="button" data-page="personal">楽しみを追加</button>
       </nav>
 
       <main>
@@ -51,18 +49,17 @@
             </div>
             <div class="calendar-grid-wrap">
               <div class="calendar-grid" id="calendarGrid" role="grid" aria-label="月間カレンダー"></div>
-              <div class="day-actions" id="selectedDateActions" hidden role="group" aria-label="選択した日付への追加方法">
+              <div class="day-actions" id="selectedDateActions" hidden role="group" aria-label="選択した日付への追加">
                 <div class="day-actions-heading">
-                  <p>この日の追加方法</p>
-                  <button class="day-actions-close" id="closeSelectedDateActions" type="button" aria-label="追加方法を閉じる">×</button>
+                  <p>この日に追加</p>
+                  <button class="day-actions-close" id="closeSelectedDateActions" type="button" aria-label="閉じる">×</button>
                 </div>
                 <div class="day-action-buttons">
-                  <button class="button button-primary button-small" id="findEventsOnDate" type="button">楽しみを探す</button>
-                  <button class="button button-outline button-small" id="addPersonalOnDate" type="button">自分の楽しみを追加</button>
+                  <button class="button button-primary button-small" id="addPersonalOnDate" type="button">楽しみを追加</button>
                 </div>
               </div>
             </div>
-            <p class="calendar-hint">日付をタップして楽しみを追加</p>
+            <p class="calendar-hint">日付をもう一度タップすると、その日に楽しみを追加できます</p>
             <div class="selected-day-panel">
               <div class="selected-day-heading">
                 <div>
@@ -75,61 +72,9 @@
           </section>
         </section>
 
-        <section class="page-view" id="page-search" aria-labelledby="searchHeading" hidden>
-          <div class="page-heading">
-            <h1 id="searchHeading">空いている日に、楽しみを。</h1>
-          </div>
-
-          <section class="search-panel" aria-label="イベント検索条件">
-            <form id="searchForm" class="search-form">
-              <label class="field">
-                <span>日付</span>
-                <input id="searchDate" name="date" type="date">
-              </label>
-              <label class="field">
-                <span>ジャンル</span>
-                <select id="searchGenre" name="genre">
-                  <option value="all">すべて</option>
-                  <option value="fps">FPS・eスポーツ</option>
-                  <option value="mahjong">麻雀リーグ</option>
-                </select>
-              </label>
-              <button class="button button-primary search-submit" type="submit">イベントを検索</button>
-            </form>
-            <div class="availability-action">
-              <div>
-                <strong>空き時間から探す</strong>
-                <p>架空の予定時間で空き枠を表示します。</p>
-              </div>
-              <button class="button button-outline" id="showAvailability" type="button">枠を見る</button>
-            </div>
-            <div class="availability-panel" id="availabilityPanel" hidden>
-              <div class="availability-title">
-                <div>
-                  <h2>空いている時間</h2>
-                  <p>予定名は表示せず、時間帯だけ表示します。</p>
-                </div>
-                <button class="icon-button" id="closeAvailability" type="button" aria-label="空き時間パネルを閉じる">×</button>
-              </div>
-              <div id="availabilityList" class="availability-list"></div>
-            </div>
-            <p class="selected-slot-note" id="selectedSlotNote" hidden></p>
-          </section>
-
-          <section class="content-section results-section">
-            <div class="section-heading">
-              <div>
-                <h2>検索結果</h2>
-              </div>
-              <span class="count-pill" id="resultCount"></span>
-            </div>
-            <div class="event-grid" id="searchResults"></div>
-          </section>
-        </section>
-
         <section class="page-view" id="page-personal" aria-labelledby="personalHeading" hidden>
           <div class="page-heading">
-            <h1 id="personalHeading">自分の楽しみを追加</h1>
+            <h1 id="personalHeading">楽しみを追加</h1>
           </div>
           <div class="personal-layout">
             <form id="personalForm" class="personal-form">
@@ -142,7 +87,7 @@
                 <input id="personalDate" name="date" type="date" required>
               </label>
               <button class="button button-primary" type="submit">追加する</button>
-              <p class="privacy-note">このブラウザー内に保存されます。</p>
+              <p class="privacy-note">このブラウザー内にだけ保存されます。</p>
             </form>
             <aside class="personal-note">
               <span class="note-icon" aria-hidden="true">✦</span>
@@ -161,9 +106,65 @@
       </main>
 
       <footer class="footer">
-        <span>これは操作確認用のローカル試作です。</span>
-        <span>表示されるイベントはすべて架空です。</span>
+        <span>登録した楽しみは、このブラウザー内にだけ保存されます。</span>
+        <button class="text-button" id="showTermsButton" type="button">利用規約・確認事項</button>
       </footer>
+    </div>
+
+    <div class="sheet" id="surveyPrompt" role="region" aria-label="アンケートのご案内" hidden>
+      <p>選択式の感想を、1分以内で教えてください（任意）</p>
+      <div class="sheet-actions">
+        <button class="button button-primary button-small" id="surveyPromptAnswer" type="button">答える</button>
+        <button class="button button-outline button-small" id="surveyPromptLater" type="button">あとで</button>
+        <button class="button button-quiet button-small" id="surveyPromptDecline" type="button">今回は答えない</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="surveyDialog" hidden>
+      <div class="modal survey-modal" role="dialog" aria-modal="true" aria-label="感想を送る">
+        <button class="modal-close" id="surveyClose" type="button" aria-label="アンケートを閉じる">×</button>
+        <div id="surveyBody"></div>
+        <label class="trap-field" aria-hidden="true">website<input id="surveyWebsite" type="text" tabindex="-1" autocomplete="off"></label>
+      </div>
+    </div>
+
+    <div class="overlay" id="termsDialog" hidden>
+      <div class="modal terms-modal" role="dialog" aria-modal="true" aria-labelledby="termsTitle">
+        <h2 id="termsTitle">楽しみカレンダー 利用規約・確認事項</h2>
+        <div class="terms-body" id="termsBody" tabindex="0">
+          <p class="terms-date">施行日：2026年10月20日</p>
+          <h3>このアプリについて</h3>
+          <p>このアプリは、日付の決まった自分の楽しみを登録し、カレンダーで眺めるための簡易Webアプリです。</p>
+          <h3>利用について</h3>
+          <p>このアプリの利用・中止は任意です。利用による効果や気持ちの変化を保証するものではありません。</p>
+          <h3>登録する内容について</h3>
+          <p>楽しみの名前には、他の人の氏名・連絡先など、他の人に関する個人情報を書かないでください。</p>
+          <h3>データの保存について</h3>
+          <p>登録した楽しみ（名前と日付）は、このブラウザ内にだけ保存されます。運営者には送信されません。アカウント登録やログインは必要ありません。別の端末や別のブラウザとは共有できません。ブラウザのデータ削除や端末の故障などで失われることがあります。運営側で復元することはできません。</p>
+          <h3>アクセス解析について</h3>
+          <p>このアプリでは、Google Analyticsによるアクセス解析を使用します。楽しみの名前や日付、登録した件数は送信しません。アクセス解析は、この利用規約に同意した後に開始します。</p>
+          <h3>アンケートについて</h3>
+          <p>このアプリには、任意のアンケートがあります。答えなくても利用できます。</p>
+          <p>回答は匿名で、運営者が管理するGoogleのサービス（Google Apps Script、Googleスプレッドシート）に送信・保存されます。送信するのは、5段階の選択式の回答、任意の自由記述、楽しみを追加したことがあるか、初めて追加した日とは別の日の回答か、回答にかかった時間、アプリの版です。楽しみの名前や日付、氏名・連絡先などは送信しません。回答を選んだ時点で、その回答が送信されます。</p>
+          <p>自由記述には、氏名・連絡先など、個人情報を書かないでください。</p>
+          <p>回答は、このアプリの改善と検証の判断に使います。公開する場合は、集計または要約のみにします。自由記述は評価の記録後に削除し、すべての回答は最終回答から12か月で削除します。</p>
+          <p>回答は匿名のため、送信後に特定の回答を探して削除することはできません。</p>
+          <p>アンケートの表示や操作の状況（回答の内容は含みません）も、アクセス解析の対象です。</p>
+          <h3>利用規約の更新、サービスの停止・仕様変更</h3>
+          <p>この利用規約・確認事項を更新した場合は、更新後の内容を確認し、同意するまでアプリを利用できません。アプリは、保守、障害、仕様変更その他の事情により、停止または変更することがあります。</p>
+        </div>
+        <div class="terms-actions" id="termsAgreeArea">
+          <p class="terms-hint" id="termsHint">最後までお読みください。</p>
+          <label class="terms-check">
+            <input id="termsRead" type="checkbox" disabled>
+            <span>利用規約・確認事項を読んだ</span>
+          </label>
+          <button class="button button-primary" id="termsAgree" type="button" disabled>同意して始める</button>
+        </div>
+        <div class="terms-actions" id="termsViewArea" hidden>
+          <button class="button button-outline" id="termsCloseView" type="button">閉じる</button>
+        </div>
+      </div>
     </div>
   </body>
 </html>
